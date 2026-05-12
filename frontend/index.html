@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UW Campus Search MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">Local-only MVP</p>
+        <h1>UW Campus Search</h1>
+        <p class="lede">
+          Find UW events and buildings with local transformer embeddings.
+        </p>
+      </header>
+
+      <section class="card">
+        <form id="search-form">
+          <label class="label" for="query">Ask a campus question</label>
+          <div class="row">
+            <input
+              id="query"
+              name="query"
+              type="text"
+              placeholder="Where is Kane Hall?"
+              autocomplete="off"
+              required
+            />
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <div class="meta" id="status">Loading index status...</div>
+      </section>
+
+      <section class="results" id="results"></section>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
+      const form = document.getElementById("search-form");
+      const queryInput = document.getElementById("query");
+
+      async function loadStatus() {
+        try {
+          const response = await fetch("/status");
+          const data = await response.json();
+
+          if (!data.index_ready) {
+            statusEl.textContent = `Index not ready: ${data.index_error}`;
+            statusEl.classList.add("error");
+            return;
+          }
+
+          const meta = data.index_meta || {};
+          const updated = meta.created_at ? `Updated ${meta.created_at}` : "";
+          statusEl.textContent = `Indexed ${data.doc_count} documents. ${updated}`;
+        } catch (error) {
+          statusEl.textContent = "Unable to load status.";
+          statusEl.classList.add("error");
+        }
+      }
+
+      function renderResults(items) {
+        resultsEl.innerHTML = "";
+
+        if (!items.length) {
+          resultsEl.innerHTML = "<p class=\"empty\">No results yet.</p>";
+          return;
+        }
+
+        items.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "result";
+
+          const title = document.createElement("h3");
+          title.textContent = item.title || "Untitled";
+
+          const meta = document.createElement("p");
+          meta.className = "result-meta";
+          const domain = item.domain ? item.domain.toUpperCase() : "";
+          const date = item.start ? item.start.slice(0, 10) : "";
+          meta.textContent = [domain, date].filter(Boolean).join(" • ");
+
+          const snippet = document.createElement("p");
+          snippet.textContent = item.snippet || "";
+
+          card.appendChild(title);
+          if (meta.textContent) {
+            card.appendChild(meta);
+          }
+          card.appendChild(snippet);
+
+          if (item.source_url) {
+            const link = document.createElement("a");
+            link.href = item.source_url;
+            link.target = "_blank";
+            link.rel = "noreferrer";
+            link.textContent = "View source";
+            card.appendChild(link);
+          }
+
+          resultsEl.appendChild(card);
+        });
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) {
+          return;
+        }
+
+        resultsEl.innerHTML = "<p class=\"empty\">Searching...</p>";
+
+        try {
+          const response = await fetch(`/search?q=${encodeURIComponent(query)}&k=6`);
+          const data = await response.json();
+          renderResults(data.results || []);
+        } catch (error) {
+          resultsEl.innerHTML = "<p class=\"empty\">Search failed.</p>";
+        }
+      });
+
+      loadStatus();
+    </script>
+  </body>
+</html>
