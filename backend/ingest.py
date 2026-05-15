@@ -16,6 +16,17 @@ from dotenv import load_dotenv
 def _required_url(
     arg_value: Optional[str], env_names: Iterable[str], arg_label: str
 ) -> str:
+    """
+    Get a required URL from argument or environment variables.
+    Args:
+        arg_value: Optional URL passed as command-line argument.
+        env_names: Iterable of environment variable names to check in order.
+        arg_label: Label for the command-line argument (used in error messages).
+    Returns:
+        The URL from argument or first matching environment variable.
+    Raises:
+        SystemExit: If URL is not provided and not found in any environment variable.
+    """
     if arg_value:
         return arg_value
     for env_name in env_names:
@@ -27,16 +38,38 @@ def _required_url(
 
 
 def _strip_html(value: str) -> str:
+    """
+    Remove HTML tags from text.
+    Args:
+        value: Text potentially containing HTML tags.
+    Returns:
+        Text with HTML tags removed and stripped of whitespace.
+    """
     if not value:
         return ""
     return re.sub(r"<[^>]+>", " ", value).strip()
 
 
 def _normalize_key(value: str) -> str:
+    """
+    Normalize string to lowercase alphanumeric with spaces.
+    Args:
+        value: String to normalize.
+    Returns:
+        Lowercase string with only alphanumeric characters and spaces.
+    """
     return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 
 def _parse_datetime(value: Optional[Any]) -> Optional[datetime]:
+    """
+    Parse various datetime formats to a UTC datetime object.
+    Handles datetime objects, date objects, time.struct_time, and ISO format strings.
+    Args:
+        value: Datetime value in various formats (datetime, date, struct_time, str, or None).
+    Returns:
+        Parsed datetime with UTC timezone, or None if parsing fails or input is None.
+    """
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -61,6 +94,13 @@ def _parse_datetime(value: Optional[Any]) -> Optional[datetime]:
 
 
 def _flatten_properties(props: Dict[str, Any]) -> List[str]:
+    """
+    Flatten dictionary properties into formatted string list.
+    Args:
+        props: Dictionary with key-value pairs to flatten.
+    Returns:
+        List of strings formatted as "key: value" for non-None scalar values.
+    """
     parts: List[str] = []
     for key, value in props.items():
         if value is None:
@@ -71,6 +111,14 @@ def _flatten_properties(props: Dict[str, Any]) -> List[str]:
 
 
 def _entry_value(entry: Dict[str, Any], keys: Iterable[str]) -> Optional[Any]:
+    """
+    Get the first non-empty value from entry using a list of keys.
+    Args:
+        entry: Dictionary to search.
+        keys: Iterable of keys to check in order.
+    Returns:
+        First non-empty value found, or None if no keys have values.
+    """
     for key in keys:
         value = entry.get(key)
         if value:
@@ -79,8 +127,14 @@ def _entry_value(entry: Dict[str, Any], keys: Iterable[str]) -> Optional[Any]:
 
 
 def _extract_from_description(description: str, label: str) -> str:
-    """Extract value from Trumba HTML description.
+    """
+    Extract value from Trumba HTML description.
     Looks for patterns like '<b>Location</b>: value<br/>' or 'Campus location: value<br/>'.
+    Args:
+        description: HTML description text from Trumba events.
+        label: Field label to extract (e.g., 'Location', 'Campus room').
+    Returns:
+        Extracted value with HTML stripped, or empty string if not found.
     """
     if not description:
         return ""
@@ -97,6 +151,20 @@ def _extract_from_description(description: str, label: str) -> str:
 
 
 def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
+    """
+    Fetch events from an RSS feed and parse into document format.
+    Parses event details from RSS entries including title, description, location,
+    and start/end times. Filters out past events based on the provided 'now' datetime.
+    Attempts to extract location from Trumba HTML descriptions.
+    Args:
+        url: URL of the RSS feed.
+        now: Current datetime to filter out past events.
+    Returns:
+        List of event documents with fields: id, domain, title, summary, text,
+        source_url, start, end, location.
+    Raises:
+        SystemExit: If RSS feed fails to parse.
+    """
     feed = feedparser.parse(url)
     if getattr(feed, "bozo", False) and not feed.entries:
         error = getattr(feed, "bozo_exception", "Unknown RSS parse error")
@@ -190,6 +258,14 @@ def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
 
 
 def _get_property(props: Dict[str, Any], keys: Iterable[str]) -> str:
+    """
+    Get first non-empty property from dictionary using list of keys.
+    Args:
+        props: Dictionary with properties.
+        keys: Iterable of keys to check in order.
+    Returns:
+        First non-empty property value as string, or empty string if none found.
+    """
     for key in keys:
         value = props.get(key)
         if value not in (None, ""):
@@ -198,6 +274,19 @@ def _get_property(props: Dict[str, Any], keys: Iterable[str]) -> str:
 
 
 def fetch_buildings_arcgis(base_url: str) -> List[Dict[str, Any]]:
+    """
+    Fetch building data from ArcGIS REST API with pagination support.
+    Queries an ArcGIS feature service endpoint with pagination to retrieve
+    all building records. Extracts building metadata like name, abbreviation,
+    code, address, and site information.
+    Args:
+        base_url: Base URL of the ArcGIS feature service (without /query suffix).
+    Returns:
+        List of building documents with fields: id, domain, title, summary, text,
+        source_url, location, abbrev, code, global_id, site, start, end.
+    Raises:
+        SystemExit: If API request fails or returns an error.
+    """
     query_url = base_url.rstrip("/") + "/query"
     docs: List[Dict[str, Any]] = []
 
@@ -318,6 +407,15 @@ def fetch_buildings_arcgis(base_url: str) -> List[Dict[str, Any]]:
 def resolve_event_locations(
     events: List[Dict[str, Any]], buildings: List[Dict[str, Any]]
 ) -> None:
+    """
+    Resolve event location strings to building IDs and enrich event text.
+    Matches event location names against building titles, abbreviations, codes,
+    and sites. Creates an index for efficient matching. Modifies events in-place
+    by adding resolved_building_id and resolved_building_name fields.
+    Args:
+        events: List of event documents to update (modified in-place).
+        buildings: List of building documents to match against.
+    """
     index: Dict[str, Dict[str, Any]] = {}
     for building in buildings:
         for key in (
@@ -352,6 +450,17 @@ def resolve_event_locations(
 
 
 def write_snapshot(docs: List[Dict[str, Any]], out_dir: Path) -> Path:
+    """
+    Write documents to timestamped and 'latest' snapshot JSON files.
+    Creates both a dated snapshot file (e.g., snapshot_20260514.json) and
+    a 'latest.json' symlink. Also writes metadata including document counts
+    by domain (events, buildings).
+    Args:
+        docs: List of documents to write.
+        out_dir: Directory where snapshot files will be written.
+    Returns:
+        Path to the dated snapshot file.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d")
     dated_path = out_dir / f"snapshot_{timestamp}.json"
@@ -376,6 +485,18 @@ def write_snapshot(docs: List[Dict[str, Any]], out_dir: Path) -> Path:
 
 
 def main() -> None:
+    """Fetch UW events and buildings data from external sources.
+    Fetches events from an RSS feed and building data from an ArcGIS API,
+    resolves event locations to buildings, and writes the combined dataset
+    to a snapshot file.
+    Command-line arguments:
+        --uw_events_rss_url: Override UW_EVENTS_RSS_URL environment variable
+        --uw_buildings_arcgis_url: Override UW_BUILDINGS_ARCGIS_URL environment variable
+        --out-dir: Output directory for snapshots (default: data/snapshots)
+    Environment variables:
+        UW_EVENTS_RSS_URL: URL of the events RSS feed (required)
+        UW_BUILDINGS_ARCGIS_URL: URL of the buildings ArcGIS API (required)
+    """
     load_dotenv()
     parser = argparse.ArgumentParser(description="Fetch UW events and buildings.")
     parser.add_argument(
