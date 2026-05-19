@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from html import unescape
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -37,7 +38,7 @@ def _clean_text(value: str) -> str:
     """
     value = re.sub(r"<[^>]+>", " ", value or "")
     value = re.sub(r"\s+", " ", value)
-    return value.replace("&nbsp;", " ").replace("&#8211;", "-").strip()
+    return unescape(value).strip()                  # Special character fix.
 
 
 def _load_query_hints() -> Dict[str, Any]:
