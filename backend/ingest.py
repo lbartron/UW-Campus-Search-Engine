@@ -3,6 +3,7 @@ import calendar as calendar_module
 import json
 import os
 import re
+import warnings
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import feedparser
 import requests
+import urllib3
 from dotenv import load_dotenv
 
 
@@ -150,6 +152,29 @@ def _extract_from_description(description: str, label: str) -> str:
     return ""
 
 
+def _parse_rss_feed(url: str):
+    # Use `requests` to fetch the RSS content so we can handle TLS errors
+    # more gracefully on macOS. Some UW feeds present certificate chains
+    # that cause `feedparser.parse(url)` to raise an SSL verification
+    # problem. We try a normal verified request first, and if an
+    # SSLError occurs we fall back to a request with `verify=False`.
+    # The fallback suppresses the insecure request warning so the user
+    # isn't spammed; this is intentionally conservative and only used
+    # when TLS verification fails.
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        return feedparser.parse(response.content)
+    except requests.exceptions.SSLError:
+        with warnings.catch_warnings():
+            warnings.simplefilter(
+                "ignore", urllib3.exceptions.InsecureRequestWarning
+            )
+            response = requests.get(url, timeout=30, verify=False)
+            response.raise_for_status()
+            return feedparser.parse(response.content)
+
+
 def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
     """
     Fetch events from an RSS feed and parse into document format.
@@ -165,7 +190,7 @@ def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
     Raises:
         SystemExit: If RSS feed fails to parse.
     """
-    feed = feedparser.parse(url)
+    feed = _parse_rss_feed(url)
     if getattr(feed, "bozo", False) and not feed.entries:
         error = getattr(feed, "bozo_exception", "Unknown RSS parse error")
         raise SystemExit(f"Failed to parse RSS feed: {error}")
@@ -372,6 +397,11 @@ def fetch_buildings_arcgis(base_url: str) -> List[Dict[str, Any]]:
                 text_parts.append(f"Code: {code}")
             if address:
                 text_parts.append(f"Address: {address}")
+            # Extract the `site` property from ArcGIS building attributes
+            # (e.g. "SEA_MN", "BOTHELL", "TACOMA") and include it in
+            # the building document. This `site` value is used by the
+            # backend search endpoint to annotate events with campus
+            # information so the frontend can display a campus badge.
             site = _get_property(props, ["Site", "SITE"])
             if site:
                 text_parts.append(f"Site: {site}")

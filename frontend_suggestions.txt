@@ -1,0 +1,89 @@
+UW Campus Search Engine - Frontend Design Suggestions
+
+Ranked from most impactful to least impactful for making the page feel more appealing and unique.
+
+1. Add interactive result previews on hover, keyboard focus, or tap
+   - Best idea: yes, this is still the strongest concept.
+   - Buildings could reveal a thumbnail image, map pin, campus zone, or a stylized building silhouette when selected.
+   - Events could reveal a category badge such as Music, Lecture, Career, Sports, or Social.
+   - Main issue: hover alone will not work well on touch screens, so the interaction should also work on focus and tap.
+   - Main issue: true previews may require extra data that the current search response does not always provide.
+   - Adjusted version: if images are unavailable, use a compact expanded card with iconography, category text, and any existing metadata instead of forcing photo previews.
+   - Why it matters: it makes the results feel responsive and gives users an immediate cue about what kind of item they are viewing.
+   - Comment: this is the most meaningful change because it improves both polish and usability, but only if it is built accessibly.
+
+2. Give each result card a stronger visual identity based on domain
+   - Buildings and events should not look identical.
+   - Use different accent colors, icons, or chip styles for each domain.
+   - Example: buildings could use a map/location treatment, while events could use a calendar or spotlight treatment.
+   - Main issue: if the styling is too different, it can make the page feel inconsistent or noisy.
+   - Adjusted version: keep the structure the same, but vary only a few elements such as border color, badge color, and iconography.
+   - Why it matters: users can scan results faster, and the page feels more designed instead of generic.
+
+3. Add a campus-themed background treatment instead of a flat or simple gradient
+   - Your husky or crow logo idea fits well here.
+   - A husky silhouette or subtle mascot watermark in the background would feel more on-brand than a large logo in the foreground.
+   - Main issue: a large mascot graphic could compete with the search results and make the page feel less serious or less readable.
+   - Main issue: an official logo may introduce branding concerns if the mark is used too prominently or without a clean source asset.
+   - Comment on your idea: the husky is the better choice since the project covers all three campuses, but it should probably be an abstract silhouette or watermark rather than a literal logo.
+   - Adjusted version: use a faint background illustration or shape motif inspired by the husky, with very low opacity and no visual clutter.
+   - Best approach: keep it subtle so it supports the layout rather than competing with the search results.
+
+4. Add richer hover states and motion to the result cards
+   - Cards could lift slightly, glow, or expand to reveal extra metadata on hover.
+   - The search field and button could also animate more noticeably when focused or submitted.
+   - Main issue: too much motion can become distracting or make the page feel gimmicky.
+   - Main issue: any animation should remain subtle and should respect reduced-motion settings.
+   - Adjusted version: use short, restrained transitions for hover, focus, and result entry, not dramatic movement.
+   - Why it matters: the current page already has a decent base style, so motion is a good way to make it feel more premium without changing the structure.
+
+5. Create a stronger hero section with a more distinctive visual composition
+   - The top of the page could include a larger title treatment, a small campus illustration, or a layered shape system behind the search box.
+   - Main issue: if the hero gets too large, it can push the search box too far down the page and make the app feel slower to use.
+   - Adjusted version: keep the search area prominent and use the hero to frame it, not replace it.
+   - Why it matters: this would make the first impression more memorable, especially since the current hero is simple and text-heavy.
+
+6. Improve the result metadata display
+   - Show clearer badges for result type, date, and maybe location category.
+   - Events could display a date pill or "happening soon" style label.
+   - Buildings could display campus or area labels.
+   - Main issue: some metadata may not exist for every result, so the layout needs to handle missing fields gracefully.
+   - Adjusted version: keep metadata optional and use consistent fallback labels so cards do not look broken when a field is missing.
+   - Why it matters: it helps users read the results faster and makes the cards feel more structured.
+
+7. Add a small empty-state and loading-state design system
+   - Instead of plain text like "Searching...", use a more polished loading state or skeleton cards.
+   - For no results, show a friendly message with a suggestion to try another query.
+   - Main issue: skeletons are only helpful if they match the eventual card layout closely enough to avoid jitter.
+   - Adjusted version: use simple, predictable loading cards and a helpful no-results message rather than complicated animated placeholders.
+   - Why it matters: this is lower impact visually, but it makes the app feel complete.
+
+8. Introduce a stronger color system and typography hierarchy
+   - The current palette is already pleasant, but it could be pushed further with a bolder accent color or more contrast between sections.
+   - You could also add a secondary display font for headings if you want the page to feel less standard.
+   - Main issue: if the type system changes too much, it can reduce readability or clash with the rest of the app.
+   - Adjusted version: keep the current font if it works, and focus on stronger spacing, hierarchy, and one or two accent colors.
+   - Why it matters: this is useful polish, but it is less distinctive than the interaction and card-level changes above.
+
+9. Add a subtle mascot mark or watermark to the search input area
+   - A very small husky/crow mark near the search bar would be a lighter version of the background-logo idea.
+   - Main issue: even a small mark can feel unnecessary if it does not add meaning or if it crowds the search field.
+   - Adjusted version: use it only as a tiny accent or badge, not as a primary decorative element.
+   - Comment on your idea: this is safer than a large background logo if you want to avoid making the page feel too busy.
+   - Why it matters: it adds identity, but it should stay understated so the search interface remains the focus.
+
+10. Add a more advanced search-results layout only if the data supports it
+   - A split layout, side preview panel, or sticky detail panel could be interesting later.
+   - Main issue: this is the easiest idea to overbuild, and it may require more data than the current frontend has.
+   - Adjusted version: treat this as a future enhancement only after the simpler card and preview interactions are working.
+   - Comment on your idea: this is only worth doing if the frontend can receive richer data from the backend or if the selected result can be expanded locally.
+   - Why it matters: potentially powerful, but it is more complex and less immediately impactful than the simpler visual upgrades above.
+
+Recommended priority order:
+- First: interactive previews on hover, focus, or tap
+- Second: domain-specific result styling
+- Third: subtle campus mascot background or watermark
+- Fourth: motion and richer hover states
+- Fifth: metadata, loading states, and hero refinements
+
+Overall recommendation: focus on making results feel responsive and campus-specific before adding large decorative elements. The mascot background can work well, but only if it stays subtle enough that the search results remain the visual center of the page.
