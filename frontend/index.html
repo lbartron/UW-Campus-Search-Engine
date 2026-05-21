@@ -60,6 +60,46 @@
         day: "numeric",
       });
 
+      function formatLastUpdated(isoValue) {
+        if (!isoValue) return "";
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) return "";
+
+        // Convert to fixed UTC-8 by subtracting 8 hours from UTC time
+        const utcMillis = date.getTime();
+        const targetMillis = utcMillis - 8 * 60 * 60 * 1000;
+        const d = new Date(targetMillis);
+
+        const MM = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const DD = String(d.getUTCDate()).padStart(2, "0");
+        const YY = String(d.getUTCFullYear()).slice(-2);
+        const HH = String(d.getUTCHours()).padStart(2, "0");
+        const mm = String(d.getUTCMinutes()).padStart(2, "0");
+
+        return `Last Updated: ${MM}-${DD}-${YY} at ${HH}:${mm} (UTC-8)`;
+      }
+      function determineCampus(item) {
+        // Prefer explicit site value from backend when present
+        const site = (item.site || "").toString().toLowerCase();
+        if (site.includes("bothell") || site.includes("bot")) return "Bothell";
+        if (site.includes("tacoma") || site.includes("tac")) return "Tacoma";
+        if (site.includes("sea") || site.includes("seattle")) return "Seattle";
+
+        const haystack = (
+          (item.resolved_building_name || "") + " " +
+          (item.location || "") + " " +
+          (item.text || "") + " " +
+          (item.source_url || "")
+        ).toLowerCase();
+
+        if (haystack.includes("bothell")) return "Bothell";
+        if (haystack.includes("tacoma")) return "Tacoma";
+        if (haystack.includes("seattle")) return "Seattle";
+
+        // Fallback: assume main Seattle campus when unspecified
+        return "Seattle";
+      }
+
       let activeCardIndex = -1;
 
       function formatDate(isoValue) {
@@ -169,8 +209,8 @@
           }
 
           const meta = data.index_meta || {};
-          const updated = meta.created_at ? `Updated ${meta.created_at}` : "";
-          statusEl.textContent = `Indexed ${data.doc_count} documents. ${updated}`;
+          const updated = meta.created_at ? formatLastUpdated(meta.created_at) : "";
+          statusEl.textContent = `Indexed ${data.doc_count} documents.${updated ? ' ' + updated : ''}`;
         } catch (error) {
           statusEl.textContent = "Unable to load status.";
           statusEl.classList.add("error");
@@ -261,6 +301,11 @@
 
           badgeRow.appendChild(domainBadge);
           badgeRow.appendChild(labelBadge);
+          const campusName = determineCampus(item);
+          const campusBadge = document.createElement("span");
+          campusBadge.className = "badge badge-campus";
+          campusBadge.textContent = campusName.toUpperCase();
+          badgeRow.appendChild(campusBadge);
 
           body.appendChild(title);
           body.appendChild(badgeRow);

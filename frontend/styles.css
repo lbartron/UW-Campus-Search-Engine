@@ -336,6 +336,8 @@ button:focus-visible,
 
 .badge-secondary { color: var(--ink); background: rgba(255, 255, 255, 0.06); }
 
+.badge-campus { color: #e7f3ff; background: rgba(70, 130, 180, 0.12); }
+
 .result-meta {
   margin: 0 0 10px;
   color: var(--muted);
