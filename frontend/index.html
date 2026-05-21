@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UW Campus Search MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css?v=7" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Local-only MVP</p>
+          <h1>UW Campus Search</h1>
+          <p class="lede">
+            Find UW events and buildings with local transformer embeddings.
+          </p>
+        </div>
+        <div class="hero-tags" aria-label="Search coverage">
+          <span>Events</span>
+          <span>Buildings</span>
+          <span>Hover or tap for previews</span>
+        </div>
+      </header>
+
+      <section class="card search-card">
+        <form id="search-form">
+          <label class="label" for="query">Ask a campus question</label>
+          <div class="row">
+            <input
+              id="query"
+              name="query"
+              type="text"
+              placeholder="Where is Kane Hall?"
+              autocomplete="off"
+              required
+            />
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <div class="meta" id="status">Loading index status...</div>
+      </section>
+
+      <section class="results" id="results" aria-live="polite" aria-busy="false"></section>
+    </main>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const resultsEl = document.getElementById("results");
+      const form = document.getElementById("search-form");
+      const queryInput = document.getElementById("query");
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+
+      function formatLastUpdated(isoValue) {
+        if (!isoValue) return "";
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) return "";
+
+        // Convert to fixed UTC-8 by subtracting 8 hours from UTC time
+        const utcMillis = date.getTime();
+        const targetMillis = utcMillis - 8 * 60 * 60 * 1000;
+        const d = new Date(targetMillis);
+
+        const MM = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const DD = String(d.getUTCDate()).padStart(2, "0");
+        const YY = String(d.getUTCFullYear()).slice(-2);
+        const HH = String(d.getUTCHours()).padStart(2, "0");
+        const mm = String(d.getUTCMinutes()).padStart(2, "0");
+
+        return `Last Updated: ${MM}-${DD}-${YY} at ${HH}:${mm} (UTC-8)`;
+      }
+      function determineCampus(item) {
+        // Prefer explicit site value from backend when present
+        const site = (item.site || "").toString().toLowerCase();
+        if (site.includes("bothell") || site.includes("bot")) return "Bothell";
+        if (site.includes("tacoma") || site.includes("tac")) return "Tacoma";
+        if (site.includes("sea") || site.includes("seattle")) return "Seattle";
+
+        const haystack = (
+          (item.resolved_building_name || "") + " " +
+          (item.location || "") + " " +
+          (item.text || "") + " " +
+          (item.source_url || "")
+        ).toLowerCase();
+
+        if (haystack.includes("bothell")) return "Bothell";
+        if (haystack.includes("tacoma")) return "Tacoma";
+        if (haystack.includes("seattle")) return "Seattle";
+
+        // Fallback: assume main Seattle campus when unspecified
+        return "Seattle";
+      }
+
+      let activeCardIndex = -1;
+
+      function formatDate(isoValue) {
+        if (!isoValue) {
+          return "";
+        }
+
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) {
+          return "";
+        }
+
+        return formatter.format(date);
+      }
+
+      function inferLabel(item) {
+        const haystack = `${item.title || ""} ${item.snippet || ""}`.toLowerCase();
+
+        if (item.domain === "event") {
+          const eventLabels = [
+            ["Lecture", ["lecture", "talk", "seminar", "panel", "speaker"]],
+            ["Workshop", ["workshop", "training", "clinic", "lab"]],
+            ["Performance", ["performance", "concert", "show", "theater", "theatre", "music"]],
+            ["Career", ["career", "job", "internship", "resume", "fair"]],
+            ["Community", ["community", "social", "festival", "celebration", "meetup"]],
+          ];
+
+          for (const [label, keywords] of eventLabels) {
+            if (keywords.some((keyword) => haystack.includes(keyword))) {
+              return label;
+            }
+          }
+
+          return "Campus event";
+        }
+
+        const buildingLabels = [
+          ["Library", ["library"]],
+          ["Residence hall", ["hall", "housing", "residence", "dorm"]],
+          ["Academic building", ["center", "building", "college", "school"]],
+          ["Lab space", ["lab", "laboratory", "research"]],
+          ["Student hub", ["union", "hub", "commons", "student"]],
+        ];
+
+        for (const [label, keywords] of buildingLabels) {
+          if (keywords.some((keyword) => haystack.includes(keyword))) {
+            return label;
+          }
+        }
+
+        return "Campus building";
+      }
+
+      function getPreviewText(item, label) {
+        if (item.domain === "event") {
+          const start = formatDate(item.start);
+          if (start) {
+            return `This event is scheduled for ${start}.`;
+          }
+
+          return `This result looks like a ${label.toLowerCase()}.`;
+        }
+
+        return `This result looks like a ${label.toLowerCase()}.`;
+      }
+
+      function setLoadingState(isLoading) {
+        resultsEl.setAttribute("aria-busy", String(isLoading));
+      }
+
+      function renderSkeletonResults() {
+        resultsEl.innerHTML = "";
+
+        for (let index = 0; index < 3; index += 1) {
+          const skeleton = document.createElement("article");
+          skeleton.className = "result skeleton";
+          skeleton.innerHTML = `
+            <div class="result-mark" aria-hidden="true"></div>
+            <div class="result-body">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line skeleton-chip"></div>
+              <div class="skeleton-line skeleton-text"></div>
+              <div class="skeleton-line skeleton-text short"></div>
+            </div>
+          `;
+          resultsEl.appendChild(skeleton);
+        }
+      }
+
+      function syncActiveState(cards, activeIndex) {
+        cards.forEach((card, index) => {
+          const isActive = index === activeIndex;
+          card.classList.toggle("is-active", isActive);
+          card.setAttribute("aria-pressed", String(isActive));
+        });
+      }
+
+      async function loadStatus() {
+        try {
+          const response = await fetch("/status");
+          const data = await response.json();
+
+          if (!data.index_ready) {
+            statusEl.textContent = `Index not ready: ${data.index_error}`;
+            statusEl.classList.add("error");
+            return;
+          }
+
+          const meta = data.index_meta || {};
+          const updated = meta.created_at ? formatLastUpdated(meta.created_at) : "";
+          statusEl.textContent = `Indexed ${data.doc_count} documents.${updated ? ' ' + updated : ''}`;
+        } catch (error) {
+          statusEl.textContent = "Unable to load status.";
+          statusEl.classList.add("error");
+        }
+      }
+
+      function renderResults(items) {
+        activeCardIndex = -1;
+        resultsEl.innerHTML = "";
+
+        if (!items.length) {
+          resultsEl.innerHTML = `
+            <div class="empty-state">
+              <p class="empty-title">No results yet.</p>
+              <p class="empty-copy">Try a building name, an event topic, or a campus landmark.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const cards = [];
+
+        items.forEach((item, index) => {
+          const card = document.createElement("article");
+          const domainClass = item.domain === "event" ? "result--event" : "result--building";
+          card.className = `result ${domainClass}`;
+          card.tabIndex = 0;
+          card.setAttribute("role", "button");
+          card.setAttribute("aria-pressed", "false");
+
+          const mark = document.createElement("div");
+          mark.className = "result-mark";
+          mark.setAttribute("aria-hidden", "true");
+
+          const body = document.createElement("div");
+          body.className = "result-body";
+
+          const title = document.createElement("h3");
+          title.textContent = item.title || "Untitled";
+
+          const badgeRow = document.createElement("div");
+          badgeRow.className = "result-badges";
+
+          const domainBadge = document.createElement("span");
+          domainBadge.className = "badge badge-domain";
+          domainBadge.textContent = item.domain ? item.domain.toUpperCase() : "RESULT";
+
+          const labelBadge = document.createElement("span");
+          labelBadge.className = "badge badge-secondary";
+          const inferredLabel = inferLabel(item);
+          labelBadge.textContent = inferredLabel;
+
+          const meta = document.createElement("p");
+          meta.className = "result-meta";
+          const domain = item.domain ? item.domain.toUpperCase() : "";
+          const date = formatDate(item.start);
+          meta.textContent = [domain, date ? `Starts ${date}` : ""].filter(Boolean).join(" • ");
+
+          const snippet = document.createElement("p");
+          snippet.textContent = item.snippet || "";
+
+          const preview = document.createElement("div");
+          preview.className = "result-preview";
+
+          const previewHeading = document.createElement("p");
+          previewHeading.className = "preview-kicker";
+          previewHeading.textContent = "Highlighted preview";
+
+          const previewText = document.createElement("p");
+          previewText.className = "preview-copy";
+          previewText.textContent = getPreviewText(item, inferredLabel);
+
+          const previewMeta = document.createElement("div");
+          previewMeta.className = "preview-meta";
+
+          const previewMetaPrimary = document.createElement("span");
+          previewMetaPrimary.textContent = inferredLabel;
+
+          const previewMetaSecondary = document.createElement("span");
+          previewMetaSecondary.textContent = date ? `Starts ${date}` : "Open the source for details";
+
+          previewMeta.appendChild(previewMetaPrimary);
+          previewMeta.appendChild(previewMetaSecondary);
+
+          preview.appendChild(previewHeading);
+          preview.appendChild(previewText);
+          preview.appendChild(previewMeta);
+
+          badgeRow.appendChild(domainBadge);
+          badgeRow.appendChild(labelBadge);
+          const campusName = determineCampus(item);
+          const campusBadge = document.createElement("span");
+          campusBadge.className = "badge badge-campus";
+          campusBadge.textContent = campusName.toUpperCase();
+          badgeRow.appendChild(campusBadge);
+
+          body.appendChild(title);
+          body.appendChild(badgeRow);
+          if (meta.textContent) {
+            body.appendChild(meta);
+          }
+          body.appendChild(snippet);
+          body.appendChild(preview);
+
+          card.appendChild(mark);
+          card.appendChild(body);
+
+          if (item.source_url) {
+            const link = document.createElement("a");
+            link.className = "result-link";
+            link.href = item.source_url;
+            link.target = "_blank";
+            link.rel = "noreferrer";
+            link.textContent = "View source";
+            body.appendChild(link);
+          }
+
+          card.addEventListener("mouseenter", () => {
+            activeCardIndex = index;
+            syncActiveState(cards, activeCardIndex);
+          });
+
+          card.addEventListener("focus", () => {
+            activeCardIndex = index;
+            syncActiveState(cards, activeCardIndex);
+          });
+
+          card.addEventListener("click", (event) => {
+            if (event.target.closest("a")) {
+              return;
+            }
+
+            activeCardIndex = activeCardIndex === index ? -1 : index;
+            syncActiveState(cards, activeCardIndex);
+          });
+
+          card.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+              activeCardIndex = -1;
+              syncActiveState(cards, activeCardIndex);
+              card.blur();
+            }
+          });
+
+          resultsEl.appendChild(card);
+          cards.push(card);
+        });
+
+        syncActiveState(cards, activeCardIndex);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) {
+          return;
+        }
+
+        renderSkeletonResults();
+        setLoadingState(true);
+
+        try {
+          const response = await fetch(`/search?q=${encodeURIComponent(query)}&k=6`);
+          const data = await response.json();
+          renderResults(data.results || []);
+        } catch (error) {
+          resultsEl.innerHTML = `
+            <div class="empty-state error-state">
+              <p class="empty-title">Search failed.</p>
+              <p class="empty-copy">Try again in a moment or check whether the backend is running.</p>
+            </div>
+          `;
+        } finally {
+          setLoadingState(false);
+        }
+      });
+
+      loadStatus();
+    </script>
+  </body>
+</html>

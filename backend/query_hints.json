@@ -1,0 +1,13 @@
+{
+  "time": {
+    "soon": ["soon", "today", "this week", "upcoming", "happening"],
+    "next_14_days": 14
+  },
+  "topics": {
+    "csse": ["csse", "cse", "computer science", "allen school", "paul g. allen", "allen"],
+    "arts": ["art", "gallery", "exhibit", "music", "theater", "performance"],
+    "career": ["career", "internship", "resume", "job", "recruiting"],
+    "wellness": ["wellness", "yoga", "fitness", "health", "mindfulness"],
+    "study": ["study", "tutoring", "workshop", "research", "commons", "library"]
+  }
+}
