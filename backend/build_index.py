@@ -11,11 +11,29 @@ from dotenv import load_dotenv
 
 
 def load_snapshot(snapshot_path: Path) -> List[Dict[str, Any]]:
+    """
+    Load a snapshot JSON file containing documents.
+    Args:
+        snapshot_path: Path to the snapshot JSON file.
+    Returns:
+        List of document dictionaries from the snapshot.
+    """
     with snapshot_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
 def main() -> None:
+    """
+    Build semantic embedding index from a snapshot of documents.
+    Loads documents from a snapshot JSON file, generates embeddings using
+    SentenceTransformer model, and saves embeddings, documents, and metadata
+    to the output directory.
+    Supports command-line arguments:
+        --snapshot: Path to snapshot JSON (default: data/snapshots/latest.json)
+        --out-dir: Output directory for index files (default: data/index)
+    Environment variables:
+        LOCAL_EMBED_MODEL: Model name to use (default: all-MiniLM-L6-v2)
+    """
     load_dotenv()
     parser = argparse.ArgumentParser(description="Build local embedding index.")
     parser.add_argument(
