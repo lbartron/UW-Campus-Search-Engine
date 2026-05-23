@@ -121,7 +121,9 @@ def _parse_rss_feed(url: str):
             return feedparser.parse(response.content)
 
 
-def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
+def fetch_events_rss(
+    url: str, now: datetime, campus: Optional[str] = None
+) -> List[Dict[str, Any]]:
     feed = _parse_rss_feed(url)
     if getattr(feed, "bozo", False) and not feed.entries:
         error = getattr(feed, "bozo_exception", "Unknown RSS parse error")
@@ -190,6 +192,8 @@ def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
         )
 
         text_parts = [title]
+        if campus:
+            text_parts.append(f"Campus: {campus}")
         if summary:
             text_parts.append(summary)
         if description and description != summary:
@@ -208,6 +212,7 @@ def fetch_events_rss(url: str, now: datetime) -> List[Dict[str, Any]]:
                 "start": start_dt.isoformat() if start_dt else None,
                 "end": end_dt.isoformat() if end_dt else None,
                 "location": location,
+                "campus": campus,
             }
         )
 
@@ -415,6 +420,18 @@ def main() -> None:
         help="Override UW_EVENTS_RSS_URL",
     )
     parser.add_argument(
+        "--uwb_events_rss_url",
+        dest="uwb_events_url",
+        default=None,
+        help="Override UWB_EVENTS_RSS_URL",
+    )
+    parser.add_argument(
+        "--uwt_events_rss_url",
+        dest="uwt_events_url",
+        default=None,
+        help="Override UWT_EVENTS_RSS_URL",
+    )
+    parser.add_argument(
         "--uw_buildings_arcgis_url",
         dest="buildings_url",
         default=None,
@@ -427,15 +444,32 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    events_url = _required_url(
-        args.events_url, ["UW_EVENTS_RSS_URL"], "uw_events_rss_url"
-    )
+    event_sources = [
+        (
+            "Seattle",
+            _required_url(args.events_url, ["UW_EVENTS_RSS_URL"], "uw_events_rss_url"),
+        ),
+        (
+            "Bothell",
+            _required_url(
+                args.uwb_events_url, ["UWB_EVENTS_RSS_URL"], "uwb_events_rss_url"
+            ),
+        ),
+        (
+            "Tacoma",
+            _required_url(
+                args.uwt_events_url, ["UWT_EVENTS_RSS_URL"], "uwt_events_rss_url"
+            ),
+        ),
+    ]
     buildings_url = _required_url(
         args.buildings_url, ["UW_BUILDINGS_ARCGIS_URL"], "uw_buildings_arcgis_url"
     )
 
     now = datetime.now(timezone.utc)
-    events = fetch_events_rss(events_url, now)
+    events: List[Dict[str, Any]] = []
+    for campus_name, event_url in event_sources:
+        events.extend(fetch_events_rss(event_url, now, campus=campus_name))
     buildings = fetch_buildings_arcgis(buildings_url)
     resolve_event_locations(events, buildings)
 
