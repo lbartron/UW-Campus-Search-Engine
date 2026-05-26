@@ -79,7 +79,13 @@
         return `Last Updated: ${MM}-${DD}-${YY} at ${HH}:${mm} (UTC-8)`;
       }
       function determineCampus(item) {
-        // Prefer explicit site value from backend when present
+        // Prefer explicit campus/site values from the backend so we only
+        // fall back to text inference when the source data is incomplete.
+        const campus = (item.campus || "").toString().toLowerCase();
+        if (campus.includes("bothell")) return "Bothell";
+        if (campus.includes("tacoma")) return "Tacoma";
+        if (campus.includes("seattle")) return "Seattle";
+
         const site = (item.site || "").toString().toLowerCase();
         if (site.includes("bothell") || site.includes("bot")) return "Bothell";
         if (site.includes("tacoma") || site.includes("tac")) return "Tacoma";

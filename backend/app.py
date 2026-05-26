@@ -255,6 +255,10 @@ def search(q: str, k: int = 5) -> Dict[str, Any]:
                 "start": doc.get("start"),
                 "end": doc.get("end"),
                 "score": float(scores[idx]),
+                # Preserve the campus label already stored in ingest output
+                # so the frontend can badge event results accurately without
+                # guessing from text when the source data is explicit.
+                "campus": doc.get("campus"),
                 "location": doc.get("location"),
                 "resolved_building_name": doc.get("resolved_building_name"),
                 "resolved_building_id": resolved_building_id,
