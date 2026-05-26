@@ -182,7 +182,7 @@ input[type="text"]:focus {
   transform: translateY(-1px);
 }
 
-button {
+button:not(.filter-button) {
   border: none;
   background: linear-gradient(180deg, #7d62be, #5f458f);
   color: #ffffff;
@@ -195,7 +195,7 @@ button {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
-button:hover { background: linear-gradient(180deg, #8a6dd0, #6a4e9e); transform: translateY(-1px); }
+button:not(.filter-button):hover { background: linear-gradient(180deg, #8a6dd0, #6a4e9e); transform: translateY(-1px); }
 
 button:focus-visible,
 .result:focus-visible,
@@ -227,6 +227,92 @@ button:focus-visible,
 .empty-title { margin: 0 0 6px; font-weight: 700; }
 
 .empty-copy { margin: 0; color: var(--muted); }
+
+.filters {
+  width: 100%;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#filter-toggle {
+  align-self: stretch;
+  min-width: 140px;
+}
+
+#filter-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.filter-panel {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(143, 118, 201, 0.14);
+  background: rgba(26, 22, 37, 0.9);
+  display: grid;
+  gap: 14px;
+}
+
+.filter-panel[hidden] {
+  display: none;
+}
+
+.filter-group {
+  display: grid;
+  gap: 8px;
+}
+
+.filter-group-heading {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+button.filter-button,
+.filter-button {
+  border: 1px solid rgba(143, 118, 201, 0.18);
+  background: rgba(128, 128, 128, 0.12);
+  color: var(--ink);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+button.filter-button:hover,
+.filter-button:hover {
+  transform: translateY(-1px);
+}
+
+button.filter-button.filter-button--neutral {
+  background: rgba(128, 128, 128, 0.14);
+  border-color: rgba(128, 128, 128, 0.24);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+button.filter-button.filter-button--include {
+  background: rgba(38, 166, 91, 0.18);
+  border-color: rgba(38, 166, 91, 0.45);
+  color: #dff3e1;
+}
+
+button.filter-button.filter-button--exclude {
+  background: rgba(244, 67, 54, 0.18);
+  border-color: rgba(244, 67, 54, 0.45);
+  color: #ffd7d2;
+}
 
 .result {
   display: grid;

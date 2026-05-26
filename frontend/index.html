@@ -42,6 +42,29 @@
               required
             />
             <button type="submit">Search</button>
+            <button id="filter-toggle" type="button" aria-expanded="false" aria-controls="filter-panel">
+              Filter badges
+            </button>
+          </div>
+          <div class="filters">
+            <div class="filter-panel" id="filter-panel" hidden>
+              <div class="filter-group">
+                <div class="filter-group-heading">Domain</div>
+                <div class="filter-buttons" id="filter-domain-buttons" role="group" aria-label="Domain filters"></div>
+              </div>
+              <div class="filter-group">
+                <div class="filter-group-heading">Campus</div>
+                <div class="filter-buttons" id="filter-campus-buttons" role="group" aria-label="Campus filters"></div>
+              </div>
+              <div class="filter-group">
+                <div class="filter-group-heading">Event type</div>
+                <div class="filter-buttons" id="filter-event-buttons" role="group" aria-label="Event type filters"></div>
+              </div>
+              <div class="filter-group">
+                <div class="filter-group-heading">Building type</div>
+                <div class="filter-buttons" id="filter-building-buttons" role="group" aria-label="Building type filters"></div>
+              </div>
+            </div>
           </div>
         </form>
         <div class="meta" id="status">Loading index status...</div>
@@ -55,10 +78,48 @@
       const resultsEl = document.getElementById("results");
       const form = document.getElementById("search-form");
       const queryInput = document.getElementById("query");
+      const filterToggle = document.getElementById("filter-toggle");
+      const filterPanel = document.getElementById("filter-panel");
+      filterPanel.hidden = true;
+      filterToggle.setAttribute("aria-expanded", "false");
+      const filterDomainButtons = document.getElementById("filter-domain-buttons");
+      const filterCampusButtons = document.getElementById("filter-campus-buttons");
+      const filterEventButtons = document.getElementById("filter-event-buttons");
+      const filterBuildingButtons = document.getElementById("filter-building-buttons");
       const formatter = new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
       });
+
+      const filterState = {
+        domain: {
+          Event: "neutral",
+          Building: "neutral",
+        },
+        campus: {
+          Seattle: "neutral",
+          Bothell: "neutral",
+          Tacoma: "neutral",
+        },
+        eventType: {
+          Lecture: "neutral",
+          Workshop: "neutral",
+          Performance: "neutral",
+          Career: "neutral",
+          Community: "neutral",
+        },
+        buildingType: {
+          Library: "neutral",
+          "Residence hall": "neutral",
+          "Academic building": "neutral",
+          "Lab space": "neutral",
+          "Student hub": "neutral",
+        },
+      };
+
+      const filterOrder = ["neutral", "include", "exclude"];
+
+      let lastSearchResults = [];
 
       function formatLastUpdated(isoValue) {
         if (!isoValue) return "";
@@ -107,6 +168,129 @@
       }
 
       let activeCardIndex = -1;
+
+      function updateFilterButton(button, state) {
+        button.classList.toggle("filter-button--neutral", state === "neutral");
+        button.classList.toggle("filter-button--include", state === "include");
+        button.classList.toggle("filter-button--exclude", state === "exclude");
+        button.setAttribute("aria-pressed", String(state === "include"));
+        button.title = `${button.textContent}: ${state}`;
+      }
+
+      function getFilterBadgeLabels(item) {
+        const domain = item.domain ? `${item.domain[0].toUpperCase()}${item.domain.slice(1)}` : "Unknown";
+        return {
+          domain,
+          campus: determineCampus(item),
+        };
+      }
+
+      function createFilterButton(label, state = "neutral", onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "filter-button filter-button--neutral";
+        button.textContent = label;
+        updateFilterButton(button, state);
+        button.addEventListener("click", () => onClick(label));
+        return button;
+      }
+
+      function nextFilterState(current) {
+        const index = filterOrder.indexOf(current);
+        return filterOrder[(index + 1) % filterOrder.length];
+      }
+
+      function renderFilterButtons() {
+        filterDomainButtons.innerHTML = "";
+        filterCampusButtons.innerHTML = "";
+
+        Object.entries(filterState.domain).forEach(([label, state]) => {
+          const button = createFilterButton(label, state, (value) => {
+            const nextState = nextFilterState(filterState.domain[value]);
+            filterState.domain[value] = nextState;
+            updateFilterButton(button, nextState);
+            renderResults(filterResults(lastSearchResults));
+          });
+          filterDomainButtons.appendChild(button);
+        });
+
+        Object.entries(filterState.campus).forEach(([label, state]) => {
+          const button = createFilterButton(label, state, (value) => {
+            const nextState = nextFilterState(filterState.campus[value]);
+            filterState.campus[value] = nextState;
+            updateFilterButton(button, nextState);
+            renderResults(filterResults(lastSearchResults));
+          });
+          filterCampusButtons.appendChild(button);
+        });
+
+        Object.entries(filterState.eventType).forEach(([label, state]) => {
+          const button = createFilterButton(label, state, (value) => {
+            const nextState = nextFilterState(filterState.eventType[value]);
+            filterState.eventType[value] = nextState;
+            updateFilterButton(button, nextState);
+            renderResults(filterResults(lastSearchResults));
+          });
+          filterEventButtons.appendChild(button);
+        });
+
+        Object.entries(filterState.buildingType).forEach(([label, state]) => {
+          const button = createFilterButton(label, state, (value) => {
+            const nextState = nextFilterState(filterState.buildingType[value]);
+            filterState.buildingType[value] = nextState;
+            updateFilterButton(button, nextState);
+            renderResults(filterResults(lastSearchResults));
+          });
+          filterBuildingButtons.appendChild(button);
+        });
+      }
+
+      function filterResults(items) {
+        return items.filter((item) => {
+          const labels = {
+            ...getFilterBadgeLabels(item),
+            eventType: item.domain === "event" ? inferLabel(item) : null,
+            buildingType: item.domain === "building" ? inferLabel(item) : null,
+          };
+
+          const groups = ["domain", "campus", "eventType", "buildingType"];
+          for (const group of groups) {
+            const currentState = filterState[group];
+            const itemLabel = labels[group];
+            if (!itemLabel) {
+              continue;
+            }
+
+            const excluded = Object.entries(currentState).some(
+              ([label, state]) => state === "exclude" && label === itemLabel
+            );
+            if (excluded) {
+              return false;
+            }
+
+            const includes = Object.entries(currentState)
+              .filter(([, state]) => state === "include")
+              .map(([label]) => label);
+            if (includes.length > 0 && !includes.includes(itemLabel)) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+      }
+
+      function toggleFilterPanel() {
+        const isHidden = filterPanel.hidden;
+        filterPanel.hidden = !isHidden;
+        filterToggle.setAttribute("aria-expanded", String(!isHidden));
+      }
+
+      filterToggle.addEventListener("click", () => {
+        toggleFilterPanel();
+      });
+
+      renderFilterButtons();
 
       function formatDate(isoValue) {
         if (!isoValue) {
@@ -228,10 +412,13 @@
         resultsEl.innerHTML = "";
 
         if (!items.length) {
+          const message = lastSearchResults.length
+            ? "No results match the current filter selection. Adjust filters or try a broader query."
+            : "No results yet. Try a building name, an event topic, or a campus landmark.";
           resultsEl.innerHTML = `
             <div class="empty-state">
-              <p class="empty-title">No results yet.</p>
-              <p class="empty-copy">Try a building name, an event topic, or a campus landmark.</p>
+              <p class="empty-title">No results.</p>
+              <p class="empty-copy">${message}</p>
             </div>
           `;
           return;
@@ -379,9 +566,10 @@
         setLoadingState(true);
 
         try {
-          const response = await fetch(`/search?q=${encodeURIComponent(query)}&k=6`);
+          const response = await fetch(`/search?q=${encodeURIComponent(query)}&k=12`);
           const data = await response.json();
-          renderResults(data.results || []);
+          lastSearchResults = data.results || [];
+          renderResults(filterResults(lastSearchResults));
         } catch (error) {
           resultsEl.innerHTML = `
             <div class="empty-state error-state">
