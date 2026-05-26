@@ -73,6 +73,20 @@ def _is_soon_query(query: str) -> bool:
     soon_terms = query_hints.get("time", {}).get("soon", [])
     return any(hint in normalized for hint in soon_terms)
 
+def _is_temporal_query(query: str, topic_name: str) -> bool:
+    """
+    Check if query contains temporal keywords indicating events in specific times.
+    Args:
+        query: The user's search query.
+    Returns:
+        True if query contains 'soon' temporal hints, False otherwise.
+    """
+    if topic_name not in query_hints.get("time", {}).keys():
+        return False
+    normalized = query.lower()
+    terms = query_hints.get("time", {}).get(topic_name, [])
+    return any(hint in normalized for hint in terms)
+
 
 def _query_topics(query: str) -> List[str]:
     """
@@ -141,13 +155,14 @@ def load_index() -> None:
 
     with DOCS_FILE.open("r", encoding="utf-8") as handle:
         docs = json.load(handle)
+        docs = [{k: v for k, v in d.items() if k is not None} for d in docs]
     # Build quick lookup by doc id for later use in search.
     # This mapping was added so we can find the building document
     # referenced by an event's `resolved_building_id` and expose the
     # building's `site` value in the search results. Frontend code
     # prefers that explicit `site` value to decide campus badges.
     global doc_by_id
-    doc_by_id = {doc.get("id"): doc for doc in docs}
+    doc_by_id = {str(doc.get("id")): doc for doc in docs if doc.get("id") is not None}
 
     emb_data = np.load(EMB_FILE)
     embeddings = emb_data["embeddings"].astype(np.float32)
@@ -205,7 +220,7 @@ def search(q: str, k: int = 5) -> Dict[str, Any]:
         doc = docs[idx]
         if want_soon and doc.get("domain") == "event":
             start_dt = _parse_dt(doc.get("start"))
-            if start_dt and start_dt > soon_cutoff:
+            if start_dt and soon_cutoff and start_dt > soon_cutoff:
                 continue
 
         adjusted_score = float(score)
@@ -217,6 +232,12 @@ def search(q: str, k: int = 5) -> Dict[str, Any]:
             start_dt = _parse_dt(doc.get("start"))
             if start_dt:
                 adjusted_score += max(0.0, 0.1 - (start_dt - datetime.now(timezone.utc)).days * 0.01)
+
+        for temporal_topic_name in query_hints.get("time", {}).keys():
+            if temporal_topic_name == "soon":
+                continue
+            if _is_temporal_query(query, temporal_topic_name):
+                adjusted_score += 1.0
 
         ranked.append((adjusted_score, idx))
 
