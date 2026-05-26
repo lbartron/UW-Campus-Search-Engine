@@ -23,7 +23,9 @@ pip install -r requirements.txt
 
 **4. Configure environment variables** (create `.env` in repo root)
 ```text
-UW_EVENTS_RSS_URL="<UW events RSS feed URL>"
+UW_EVENTS_RSS_URL="https://www.trumba.com/calendars/sea_campus.rss"
+UWB_EVENTS_RSS_URL="https://www.trumba.com/calendars/bot_campus.rss"
+UWT_EVENTS_RSS_URL="https://www.trumba.com/calendars/tac_campus.rss"
 UW_BUILDINGS_ARCGIS_URL="https://gis.maps.uw.edu/federated/rest/services/PublicData/PublicData/FeatureServer/12"
 LOCAL_EMBED_MODEL="all-MiniLM-L6-v2"
 ```
