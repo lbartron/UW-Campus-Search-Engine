@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - campus-badges
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      CI_LIGHTWEIGHT_MODEL: "1"
+      BASE_URL: http://127.0.0.1:8000
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+
+      - name: Start application
+        run: |
+          nohup python3 -m uvicorn backend.app:app --host 127.0.0.1 --port 8000 --log-level warning > /tmp/uw-campus-search.log 2>&1 &
+          echo $! > /tmp/uw-campus-search.pid
+
+      - name: Wait for site
+        run: |
+          python3 - <<'PY'
+          import sys
+          import time
+          from pathlib import Path
+
+          import requests
+
+          base_url = "http://127.0.0.1:8000"
+          deadline = time.time() + 60
+          last_error = None
+
+          while time.time() < deadline:
+              try:
+                  response = requests.get(f"{base_url}/status", timeout=5)
+                  if response.status_code == 200:
+                      sys.exit(0)
+                  last_error = f"unexpected status {response.status_code}"
+              except requests.RequestException as exc:
+                  last_error = str(exc)
+              time.sleep(2)
+
+          log_path = Path("/tmp/uw-campus-search.log")
+          log_excerpt = log_path.read_text()[-4000:] if log_path.exists() else ""
+          raise SystemExit(f"Website unavailable at {base_url}: {last_error}\n{log_excerpt}")
+          PY
+
+      - name: Run tests
+        run: pytest -q

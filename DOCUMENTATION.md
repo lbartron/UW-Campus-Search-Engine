@@ -132,4 +132,15 @@ For events, response includes `start` and `end` ISO datetime strings.
 - **Frontend:** Static files can be deployed to CDN (Vercel, Netlify)
 - **Production scaling:** Consider Pinecone for vector DB if moving beyond local storage
 
+## CI/CD
+
+The repository now includes a GitHub Actions workflow at `.github/workflows/ci.yml` that runs on pushes and pull requests.
+
+- Installs Python dependencies with `pip`
+- Starts the FastAPI app in a lightweight CI mode using `CI_LIGHTWEIGHT_MODEL=1`
+- Fails the job if the website or `/status` endpoint is unavailable
+- Runs pytest-based checks for campus coverage, campus tag accuracy, and homepage/status availability
+
+This pipeline is designed to catch two common regressions early: the app failing to boot in automation and campus badges drifting away from the underlying indexed data.
+
 **Last Updated:** May 2026

@@ -36,6 +36,11 @@ python backend/ingest.py
 python backend/build_index.py
 ```
 
+```For MacOS
+python3 backend/ingest.py
+python3 backend/build_index.py
+```
+
 **6. Run the server**
 ```powershell
 uvicorn backend.app:app --reload
