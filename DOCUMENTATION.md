@@ -137,10 +137,9 @@ For events, response includes `start` and `end` ISO datetime strings.
 The repository now includes a GitHub Actions workflow at `.github/workflows/ci.yml` that runs on pushes and pull requests.
 
 - Installs Python dependencies with `pip`
-- Starts the FastAPI app in a lightweight CI mode using `CI_LIGHTWEIGHT_MODEL=1`
-- Fails the job if the website or `/status` endpoint is unavailable
+- Builds a synthetic in-memory index fixture instead of relying on committed `data/index` artifacts
 - Runs pytest-based checks for campus coverage, campus tag accuracy, and homepage/status availability
 
-This pipeline is designed to catch two common regressions early: the app failing to boot in automation and campus badges drifting away from the underlying indexed data.
+This pipeline is designed to catch two common regressions early: the app failing to serve its routes in automation and campus badges drifting away from the underlying indexed data model.
 
 **Last Updated:** May 2026
