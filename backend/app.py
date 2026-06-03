@@ -1,4 +1,6 @@
+import hashlib
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -33,6 +35,30 @@ query_hints: Dict[str, Any] = {"time": {}, "topics": {}}
 doc_by_id: Dict[str, Dict[str, Any]] = {}
 
 
+class _LightweightEmbeddingModel:
+    # CI uses this fallback so the app can boot and answer /status without
+    # downloading the full SentenceTransformer model during test runs.
+    def encode(self, texts, normalize_embeddings=True):
+        if isinstance(texts, str):
+            texts = [texts]
+
+        embeddings = np.zeros((len(texts), 384), dtype=np.float32)
+        for row, text in enumerate(texts):
+            tokens = re.findall(r"[a-z0-9]+", str(text).lower())
+            for token in tokens:
+                digest = hashlib.sha256(token.encode("utf-8")).digest()
+                for offset in range(0, len(digest), 4):
+                    bucket = int.from_bytes(digest[offset : offset + 4], "little") % embeddings.shape[1]
+                    embeddings[row, bucket] += 1.0
+
+            if normalize_embeddings:
+                norm = np.linalg.norm(embeddings[row])
+                if norm:
+                    embeddings[row] /= norm
+
+        return embeddings
+
+
 def _clean_text(value: str) -> str:
     """
     Remove HTML tags and normalize whitespace in text.
@@ -59,6 +85,14 @@ def _load_query_hints() -> Dict[str, Any]:
         return {"time": {}, "topics": {}}
     with QUERY_HINTS_FILE.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def _create_embedding_model(model_name: str):
+    # The CI pipeline sets CI_LIGHTWEIGHT_MODEL=1 to avoid heavy model loads
+    # while still exercising the API startup and search code paths.
+    if os.getenv("CI_LIGHTWEIGHT_MODEL") == "1":
+        return _LightweightEmbeddingModel()
+    return SentenceTransformer(model_name)
 
 
 def _is_soon_query(query: str) -> bool:
@@ -174,7 +208,7 @@ def load_index() -> None:
     query_hints = _load_query_hints()
 
     model_name = index_meta.get("model", "all-MiniLM-L6-v2")
-    model = SentenceTransformer(model_name)
+    model = _create_embedding_model(model_name)
     index_error = None
 
 

@@ -132,4 +132,14 @@ For events, response includes `start` and `end` ISO datetime strings.
 - **Frontend:** Static files can be deployed to CDN (Vercel, Netlify)
 - **Production scaling:** Consider Pinecone for vector DB if moving beyond local storage
 
+## CI/CD
+
+The repository now includes a GitHub Actions workflow at `.github/workflows/ci.yml` that runs on pushes and pull requests.
+
+- Installs Python dependencies with `pip`
+- Builds a synthetic in-memory index fixture instead of relying on committed `data/index` artifacts
+- Runs pytest-based checks for campus coverage, campus tag accuracy, and homepage/status availability
+
+This pipeline is designed to catch two common regressions early: the app failing to serve its routes in automation and campus badges drifting away from the underlying indexed data model.
+
 **Last Updated:** May 2026

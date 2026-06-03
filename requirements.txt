@@ -5,3 +5,5 @@ feedparser
 python-dotenv
 sentence-transformers
 numpy
+pytest
+httpx
