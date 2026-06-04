@@ -1,9 +1,0 @@
-fastapi
-uvicorn[standard]
-requests
-feedparser
-python-dotenv
-sentence-transformers
-numpy
-pytest
-httpx
